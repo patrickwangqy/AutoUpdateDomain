@@ -27,7 +27,7 @@ import argparse
 def get_ip():
     session = requests.Session()
     session.trust_env = False
-    response = session.get('http://2018.ip138.com/ic.asp')
+    response = session.get('http://2019.ip138.com/ic.asp')
     response.encoding = 'gbk'
     tree = html.fromstring(response.text)
     content = str(tree.xpath('//center/text()')[0])
@@ -72,7 +72,7 @@ def make_common_parameter_list(access_key_id):
     return request_parameter
 
 
-def get_record(rr, domain, access_key_id, access_key_secret):
+def get_record(domain, rr, access_key_id, access_key_secret):
     parameter_list = make_common_parameter_list(access_key_id)
     parameter_list['Action'] = 'DescribeDomainRecords'
     parameter_list['DomainName'] = domain
@@ -81,16 +81,12 @@ def get_record(rr, domain, access_key_id, access_key_secret):
     result_json = json.loads(result.text)
     for record in result_json['DomainRecords']['Record']:
         if record['RR'] == rr:
-            return record['RecordId'], record['Value']
+            return record['Value'], record['RecordId']
     else:
-        return ''
+        return None, None
 
 
-def update_recode(rr, domain, ip, access_key_id, access_key_secret):
-    record_id, record_ip = get_record(rr, domain, access_key_id, access_key_secret)
-    if record_ip == ip:
-        print(f"{ip} for {rr}.{domain} is already latest")
-        return
+def update_record(domain, rr, record_id, ip, access_key_id, access_key_secret):
     parameter_list = make_common_parameter_list(access_key_id)
     parameter_list['Action'] = 'UpdateDomainRecord'
     parameter_list['RecordId'] = record_id
@@ -98,8 +94,23 @@ def update_recode(rr, domain, ip, access_key_id, access_key_secret):
     parameter_list['Type'] = 'A'
     parameter_list['Value'] = ip
     url = make_get_url(parameter_list, access_key_secret)
-    result = requests.get(url)
-    print(result)
+    response = requests.get(url)
+    result = json.loads(response.content.decode("utf-8"))
+    return result
+
+
+def monitor_domain(domain, subdomain, secret_id, secret_key):
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    current_ip = get_ip()
+    print(f"current ip is {current_ip}")
+    record_ip, record_id = get_record(domain, subdomain, secret_id, secret_key)
+    if current_ip != record_ip:
+        print(f"record ip is {record_ip}, current ip and record ip are the different")
+        print("updating record ip")
+        result = update_record(domain, subdomain, record_id, current_ip, secret_id, secret_key)
+        print(result["Code"], result["Message"])
+    else:
+        print("current ip and record ip are the same")
 
 
 def main():
@@ -112,12 +123,10 @@ def main():
     args = parser.parse_args()
     while True:
         try:
-            new_content = get_ip()
-            print(f"Current Ip : {new_content}")
-            update_recode(args.rr, args.domain, new_content, args.access_key_id, args.access_key_secret)
-        except:
-            pass
-        time.sleep(60)
+            monitor_domain(args.domain, args.rr, args.access_key_id, args.access_key_secret)
+            time.sleep(args.sleep)
+        except Exception as e:
+            print(e)
 
 
 if __name__ == '__main__':

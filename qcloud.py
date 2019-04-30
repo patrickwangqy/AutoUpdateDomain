@@ -15,7 +15,7 @@ import argparse
 def get_ip():
     session = requests.Session()
     session.trust_env = False
-    response = session.get('http://2018.ip138.com/ic.asp')
+    response = session.get('http://2019.ip138.com/ic.asp')
     response.encoding = 'gbk'
     tree = html.fromstring(response.text)
     content = str(tree.xpath('//center/text()')[0])
@@ -94,8 +94,11 @@ def main():
     parser.add_argument("--sleep", type=int, default=60)
     args = parser.parse_args()
     while True:
-        monitor_domain(args.domain, args.rr, args.access_key_id, args.access_key_secret)
-        time.sleep(60)
+        try:
+            monitor_domain(args.domain, args.rr, args.access_key_id, args.access_key_secret)
+            time.sleep(args.sleep)
+        except Exception as e:
+            print(e)
 
 
 if __name__ == '__main__':
